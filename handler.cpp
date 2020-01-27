@@ -6,16 +6,9 @@
 using std::cin, std::cout, std::cerr, std::endl;
 const unsigned int MAX_BUF = 8192;
 
-void handler::handle(int fd, const sockaddr *client_addr, socklen_t client_addr_len) {
-    char host_name[MAX_BUF], host_port[MAX_BUF], buffer[MAX_BUF];
+void handler::handle(int fd) {
+    char buffer[MAX_BUF];
 
-    memset(host_name, 0, sizeof(host_name));
-    memset(host_port, 0, sizeof(host_port));
-
-    getnameinfo(client_addr, client_addr_len, host_name, sizeof(host_name),
-                host_port, sizeof(host_port), 0);
-
-    printf("Received Request from: %s, port: %s \n", host_name, host_port);
     request http_request{};
     helper::read_http_first_line(fd, http_request);
     helper::parse_header(fd, http_request);
@@ -55,10 +48,24 @@ void handler::handle(int fd, const sockaddr *client_addr, socklen_t client_addr_
     http_response.header["Content-length"] = std::to_string(file_stat.st_size);
 
     string build_response = http_response.build();
-    write(fd, build_response.c_str(), build_response.size());
+    const ssize_t headern = write(fd, build_response.c_str(), build_response.size());
+    if (headern <= 0) return;
 
     int file_block_size = 0;
     while ((file_block_size = fread(buffer, sizeof(char), MAX_BUF, fp)) > 0) {
-        write(fd, buffer, file_block_size);
+        const int bodyn = write(fd, buffer, file_block_size);
+        if (bodyn <= 0) return;
     }
+}
+
+void handler::handle_print_client_info(sockaddr* client_addr, socklen_t client_addr_len) {
+    char host_name[MAX_BUF], host_port[MAX_BUF];
+
+    memset(host_name, 0, sizeof(host_name));
+    memset(host_port, 0, sizeof(host_port));
+
+    getnameinfo(client_addr, client_addr_len, host_name, sizeof(host_name),
+                host_port, sizeof(host_port), 0);
+
+    printf("Received Request from: %s, port: %s \n", host_name, host_port);
 }
