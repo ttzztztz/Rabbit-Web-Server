@@ -4,14 +4,18 @@
 #include <netinet/in.h>
 #include <sys/epoll.h>
 #include <sys/signal.h>
+#include <unordered_map>
 
+#include "request.h"
 #include "handler.h"
 #include "epoll_helper.h"
+#include "thread_poll.h"
 
 const unsigned int MAX_EVENTS = 128;
 const unsigned int FD_SIZE = 1024;
 
 int main() {
+    thread_poll poll(8);
     signal(SIGPIPE, SIG_IGN);
 
     sockaddr_in server_addr{};

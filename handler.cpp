@@ -12,10 +12,9 @@ void handler::handle(int fd) {
     request http_request{};
     helper::read_http_first_line(fd, http_request);
     helper::parse_header(fd, http_request);
+    helper::parse_body(fd, http_request);
 
     printf("Request parsed [%s] %s \n", http_request.method.c_str(), http_request.path.c_str());
-    // todo: recv request body
-
     response http_response{};
     if (http_request.method != "GET") {
         http_response.code = "405";

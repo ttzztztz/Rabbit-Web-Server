@@ -48,6 +48,10 @@ void helper::parse_header(int fd, request &req) {
     }
 }
 
+void helper::parse_body(int fd, request &req) {
+    // todo: finish
+}
+
 optional<string> helper::read_file_extension(const string &url) {
     int index = url.find('.');
     if (index == std::string::npos) {
