@@ -7,7 +7,8 @@
 
 class handler {
 public:
-    static void handle(int fd, const sockaddr *client_addr, socklen_t client_addr_len);
+    static void handle_print_client_info(sockaddr* client_addr, socklen_t client_addr_len);
+    static void handle(int fd);
 };
 
 
