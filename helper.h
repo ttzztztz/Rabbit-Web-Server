@@ -8,22 +8,26 @@
 #include <cstring>
 #include <unordered_set>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <memory>
 
 #include "request.h"
+#include "connection.h"
 
-using std::string, std::stringstream, std::optional, std::unordered_set, std::memset;
+using std::string, std::stringstream, std::optional, std::unordered_set, std::memset, std::shared_ptr;
 
 class helper {
 public:
-    static string readline_from_fd(int fd);
-    static void read_http_first_line(int fd, request& req);
-    static void parse_header(int fd, request& req);
-    static void parse_body(int fd, request& req);
+    static string readline_from_connection(shared_ptr<connection> conn);
+    static void read_http_first_line(shared_ptr<connection> conn);
+    static void parse_header(shared_ptr<connection> conn);
+    static void parse_body(shared_ptr<connection> conn);
     static optional<string> read_file_extension(const string& url);
     static string get_file_type(const string& file_extensions);
     static bool file_exist(const string& file_name, struct stat& file_stat);
-    
-    static void test();
+    static void set_non_block(const int fd);
+private:
+    static int read_one_char_from_connection(char& buff, shared_ptr<connection> conn);
 };
 
 

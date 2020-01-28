@@ -1,41 +1,107 @@
 #include "handler.h"
-#include "request.h"
-#include "helper.h"
-#include "response.h"
-#include "epoll_helper.h"
 
 using std::cin, std::cout, std::cerr, std::endl;
 const unsigned int MAX_BUF = 8192;
 
-void handler::handle(int epoll_fd, int conn_fd) {
-    signal(SIGPIPE, SIG_IGN);
+void handler::write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
+    bool exec_result = handler::_write(epoll_fd, conn_fd, conn);
 
-    handler::_handle_read(conn_fd);
-    close(conn_fd);
-    epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN);
+    if (exec_result) {
+        conn->dispose();
+    }
 }
 
-void handler::_handle_read(int fd) {
-    char buffer[MAX_BUF];
+void handler::read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
+    bool exec_result = handler::_read(epoll_fd, conn_fd, conn);
 
-    request http_request{};
-    helper::read_http_first_line(fd, http_request);
-    helper::parse_header(fd, http_request);
-    helper::parse_body(fd, http_request);
+    if (exec_result) {
+        conn->dispose();
+    }
+}
 
-    printf("Request parsed [%s] %s \n", http_request.method.c_str(), http_request.path.c_str());
+bool handler::_write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
+    if (conn->req == nullptr && conn->read.empty()) {
+        return false;
+    }
+    if (conn->req == nullptr) {
+        handler::parse_header(conn);
+    }
+
+    int n = 0, remain = conn->write.size() - conn->write_ptr;
+    while ((n = ::write(conn_fd, conn->write.c_str() + conn->write_ptr, remain)) > 0) {
+        printf("[%d] written %d \n", conn_fd, n);
+        
+        conn->write_ptr += n;
+        remain -= n;
+    }
+
+    if (conn->write.size() == conn->write_ptr) {
+        printf("[%d] file sent completed \n", conn_fd);
+        return true;
+    }
+
+    if (n < 0) {
+        printf("[%d] remain %d resources, %d -> %s signal received \n", conn_fd, remain, errno, ::strerror(errno));
+    }
+
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        return false;
+    }
+
+    ::close(conn_fd);
+    return true;
+}
+
+bool handler::_read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
+    char buf[8196];
+    int n = 0;
+
+    string& read_storage = conn->read;
+    while ((n = ::read(conn_fd, buf, sizeof(buf))) > 0) {
+        printf("[%d] received %d \n", conn_fd, n);
+        read_storage.append(buf, n);
+
+        if (read_storage.size() > 4 && read_storage.substr(read_storage.length() - 4, 4) == "\r\n\r\n") {
+            return handler::_write(epoll_fd, conn_fd, conn);
+        }
+    }
+
+    if (n < 0) {
+        printf("[%d] %d -> %s signal received \n", conn_fd, errno, ::strerror(errno));
+    }
+
+    if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+        return false;
+    }
+
+    ::close(conn_fd);
+    return true;
+}
+
+void handler::parse_header(shared_ptr<connection> conn) {
+    conn->req = unique_ptr<request>(new request());
+
+    helper::read_http_first_line(conn);
+    helper::parse_header(conn);
+    helper::parse_body(conn);
+
+    // free memory
+    conn->read.clear();
+    conn->read_ptr = 0;
+    printf("Request parsed\n");
+
+    const auto& http_request = conn->req;
     response http_response{};
-    if (http_request.method != "GET") {
+    if (http_request->method != "GET") {
         http_response.code = "405";
         http_response.message = "Method not allowed";
 
-        string build_response = http_response.build();
-        write(fd, build_response.c_str(), build_response.size());
+        conn->write = http_response.build();
         return;
     }
 
-    const string file_path = "./static" + http_request.path;
-    optional<string> file_extension = helper::read_file_extension(http_request.path);
+    const string file_path = "./static" + http_request->path;
+    optional<string> file_extension = helper::read_file_extension(http_request->path);
     struct stat file_stat{};
     FILE *fp = fopen(file_path.c_str(), "r");
 
@@ -45,28 +111,27 @@ void handler::_handle_read(int fd) {
         http_response.code = "404";
         http_response.message = "Not found";
 
-        string build_response = http_response.build();
-        write(fd, build_response.c_str(), build_response.size());
+        conn->write = http_response.build();
         return;
     }
-
     http_response.code = "200";
     http_response.message = "OK";
     http_response.header["Content-type"] = helper::get_file_type(file_extension.value());
     http_response.header["Content-length"] = std::to_string(file_stat.st_size);
 
-    string build_response = http_response.build();
-    const ssize_t headern = write(fd, build_response.c_str(), build_response.size());
-    if (headern <= 0) return;
-
+    conn->write = http_response.build();
     int file_block_size = 0;
-    while ((file_block_size = fread(buffer, sizeof(char), MAX_BUF, fp)) > 0) {
-        const int bodyn = write(fd, buffer, file_block_size);
-        if (bodyn <= 0) return;
+    char buffer[8192];
+    while ((file_block_size = fread(buffer, sizeof(char), 8192, fp)) > 0) {
+        conn->write.append(buffer, file_block_size);
     }
+    fclose(fp);
+
+    // todo: can we only read a component of file in order to save memory when the file is very large and the request is very dense ?
+    printf("File read completed \n");
 }
 
-void handler::handle_print_client_info(sockaddr* client_addr, socklen_t client_addr_len) {
+void handler::print_client_info(sockaddr* client_addr, socklen_t client_addr_len) {
     char host_name[MAX_BUF], host_port[MAX_BUF];
 
     memset(host_name, 0, sizeof(host_name));

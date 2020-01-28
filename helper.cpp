@@ -1,10 +1,19 @@
 #include "helper.h"
 
-string helper::readline_from_fd(int fd) {
+int helper::read_one_char_from_connection(char& buff, shared_ptr<connection> conn) {
+    if (conn->read_ptr == conn->read.size()) {
+        return 0;
+    }
+    buff = conn->read[conn->read_ptr];
+    conn->read_ptr++;
+    return 1;
+}
+
+string helper::readline_from_connection(shared_ptr<connection> conn) {
     string result;
     char last_buf = '\0', buf = '\0';
 
-    while (read(fd, &buf, 1) > 0) {
+    while (helper::read_one_char_from_connection(buf, conn) > 0) {
         if (last_buf == '\r' && buf == '\n') {
             result.pop_back();
             break;
@@ -21,16 +30,16 @@ string helper::readline_from_fd(int fd) {
     return result;
 }
 
-void helper::read_http_first_line(int fd, request &req) {
+void helper::read_http_first_line(shared_ptr<connection> conn) {
     stringstream ss;
 
-    ss << readline_from_fd(fd);
-    ss >> req.method >> req.path >> req.version;
+    ss << readline_from_connection(conn);
+    ss >> conn->req->method >> conn->req->path >> conn->req->version;
 }
 
-void helper::parse_header(int fd, request &req) {
+void helper::parse_header(shared_ptr<connection> conn) {
     string buffer;
-    while (!(buffer = helper::readline_from_fd(fd)).empty()) {
+    while (!(buffer = helper::readline_from_connection(conn)).empty()) {
         const size_t line_length = buffer.size();
         string key, value;
         size_t ptr = 0;
@@ -44,11 +53,11 @@ void helper::parse_header(int fd, request &req) {
         key = buffer.substr(0, ptr);
         value = buffer.substr(ptr + 2);
 
-        req.header[key] = value;
+        conn->req->header[key] = value;
     }
 }
 
-void helper::parse_body(int fd, request &req) {
+void helper::parse_body(shared_ptr<connection> conn) {
     // char buffer[8192];
     // memset(buffer, 0, sizeof(buffer));
 
@@ -89,6 +98,11 @@ bool helper::file_exist(const string &file_name, struct stat& file_stat) {
     return stat(file_name.c_str(), &file_stat) >= 0;
 }
 
-void helper::test() {
-    std::cout << "test!!!";
+void helper::set_non_block(const int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) {
+        printf("[%d] set non-block io failed", fd);
+        return;
+    }
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
 }

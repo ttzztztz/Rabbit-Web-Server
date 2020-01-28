@@ -3,7 +3,11 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
+#include <unordered_map>
+#include <csignal>
+#include <memory>
 
+#include "connection.h"
 #include "helper.h"
 #include "request.h"
 #include "handler.h"
@@ -13,9 +17,12 @@
 const unsigned int MAX_EVENTS = 128;
 const unsigned int FD_SIZE = 1024;
 
-using std::bind;
+using std::bind, std::unordered_map, std::shared_ptr;
+unordered_map<int, shared_ptr<connection>> connection_storage;
 
 int main() {
+    signal(SIGPIPE, SIG_IGN);
+
     thread_poll poll(8);
     
     sockaddr_in server_addr{};
@@ -31,6 +38,7 @@ int main() {
 
     bind(listen_fd, reinterpret_cast<sockaddr *>(&server_addr), sizeof(server_addr));
     listen(listen_fd, 5);
+    helper::set_non_block(listen_fd);
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
@@ -39,7 +47,7 @@ int main() {
 
         for (int i = 0; i < active; i++) {
             const int fd = events[i].data.fd, ev = events[i].events;
-            if (fd == listen_fd && (ev & EPOLLIN)) {
+            if (fd == listen_fd && (ev & (EPOLLIN | EPOLLERR))) {
                 sockaddr_in client_addr{};
                 socklen_t client_addr_len = sizeof(client_addr);
 
@@ -47,15 +55,33 @@ int main() {
                 if (conn_fd != -1) {
                     printf("[%d] Connection Established\n", conn_fd);
 
-                    handler::handle_print_client_info(reinterpret_cast<sockaddr *>(&client_addr), client_addr_len);
-                    epoll_helper::create_event(epoll_fd, conn_fd, EPOLLIN);
-                }
-            } else if (ev & EPOLLIN) {
-                int conn_fd = events[i].data.fd;
+                    helper::set_non_block(conn_fd);
+                    handler::print_client_info(reinterpret_cast<sockaddr *>(&client_addr), client_addr_len);
+                    epoll_helper::create_event(epoll_fd, conn_fd, EPOLLIN | EPOLLOUT | EPOLLET);
 
-                epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN);
-                printf("[%d] connect epoll in event \n", conn_fd);
-                poll.push(bind(handler::handle, epoll_fd, conn_fd));
+                    if (connection_storage.count(conn_fd)) {
+                        connection_storage.erase(conn_fd);
+                    }
+                    connection_storage[conn_fd] = unique_ptr<connection>(new connection());
+                }
+            } else if (ev & (EPOLLIN | EPOLLERR)) {
+                int conn_fd = events[i].data.fd;
+                printf("[%d] connect epoll_in event \n", conn_fd);
+                if (!connection_storage.count(conn_fd)) {
+                    printf("[%d] conn_fd invalid \n", conn_fd);
+                    continue;
+                }
+
+                poll.push(bind(handler::read, epoll_fd, conn_fd, connection_storage[conn_fd]));
+            } else if (ev & EPOLLOUT) {
+                int conn_fd = events[i].data.fd;
+                printf("[%d] connect epoll_out event \n", conn_fd);
+                if (!connection_storage.count(conn_fd)) {
+                    printf("[%d] conn_fd invalid \n", conn_fd);
+                    continue;
+                }
+
+                poll.push(bind(handler::write, epoll_fd, conn_fd, connection_storage[conn_fd]));
             }
         }
     }
