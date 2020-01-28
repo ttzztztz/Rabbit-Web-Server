@@ -13,8 +13,11 @@
 #include "helper.h"
 #include "response.h"
 #include "epoll_helper.h"
+#include "concurrent_hashmap.h"
 
 using std::shared_ptr;
+
+extern concurrent_hashmap<int, shared_ptr<connection>> connection_storage;
 
 class handler {
 public:
@@ -24,7 +27,6 @@ public:
     static void write(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
 private:
     static void parse_header(shared_ptr<connection> conn);
-    static bool write_file(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
 
     static bool _read(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
     static bool _write(int epoll_fd, int conn_fd, shared_ptr<connection> conn);

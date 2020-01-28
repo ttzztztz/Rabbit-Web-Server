@@ -20,7 +20,7 @@ public:
     unique_ptr<request> req;
 
     connection();
-    void dispose();
+    // void dispose();
 };
 
 

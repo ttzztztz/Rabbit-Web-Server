@@ -6,11 +6,11 @@ connection::connection() {
     this->req = nullptr;
 }
 
-void connection::dispose() {
-    this->read_ptr = 0;
-    this->write_ptr = 0;
+// void connection::dispose() {
+//     this->read_ptr = 0;
+//     this->write_ptr = 0;
 
-    this->read.clear();
-    this->write.clear();
-    this->req.reset();
-}
+//     this->read.clear();
+//     this->write.clear();
+//     this->req.reset();
+// }

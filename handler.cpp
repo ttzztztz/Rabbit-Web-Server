@@ -3,11 +3,13 @@
 using std::cin, std::cout, std::cerr, std::endl;
 const unsigned int MAX_BUF = 8192;
 
+extern concurrent_hashmap<int, shared_ptr<connection>> connection_storage;
+
 void handler::write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
     bool exec_result = handler::_write(epoll_fd, conn_fd, conn);
 
     if (exec_result) {
-        conn->dispose();
+        connection_storage.erase(conn_fd);
     }
 }
 
@@ -15,7 +17,7 @@ void handler::read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
     bool exec_result = handler::_read(epoll_fd, conn_fd, conn);
 
     if (exec_result) {
-        conn->dispose();
+        connection_storage.erase(conn_fd);
     }
 }
 

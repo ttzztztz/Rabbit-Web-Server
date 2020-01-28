@@ -3,10 +3,9 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
-#include <unordered_map>
 #include <csignal>
-#include <memory>
 
+#include "concurrent_hashmap.h"
 #include "connection.h"
 #include "helper.h"
 #include "request.h"
@@ -17,12 +16,12 @@
 const unsigned int MAX_EVENTS = 128;
 const unsigned int FD_SIZE = 1024;
 
-using std::bind, std::unordered_map, std::shared_ptr;
-unordered_map<int, shared_ptr<connection>> connection_storage;
+using std::bind;
+
+concurrent_hashmap<int, shared_ptr<connection>> connection_storage;
 
 int main() {
     signal(SIGPIPE, SIG_IGN);
-
     thread_poll poll(8);
     
     sockaddr_in server_addr{};
@@ -62,7 +61,7 @@ int main() {
                     if (connection_storage.count(conn_fd)) {
                         connection_storage.erase(conn_fd);
                     }
-                    connection_storage[conn_fd] = unique_ptr<connection>(new connection());
+                    connection_storage.set(conn_fd, shared_ptr<connection>(new connection()));
                 }
             } else if (ev & (EPOLLIN | EPOLLERR)) {
                 int conn_fd = events[i].data.fd;
@@ -72,7 +71,7 @@ int main() {
                     continue;
                 }
 
-                poll.push(bind(handler::read, epoll_fd, conn_fd, connection_storage[conn_fd]));
+                poll.push(bind(handler::read, epoll_fd, conn_fd, connection_storage.get(conn_fd)));
             } else if (ev & EPOLLOUT) {
                 int conn_fd = events[i].data.fd;
                 printf("[%d] connect epoll_out event \n", conn_fd);
@@ -81,7 +80,7 @@ int main() {
                     continue;
                 }
 
-                poll.push(bind(handler::write, epoll_fd, conn_fd, connection_storage[conn_fd]));
+                poll.push(bind(handler::write, epoll_fd, conn_fd, connection_storage.get(conn_fd)));
             }
         }
     }
