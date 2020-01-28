@@ -16,6 +16,7 @@ thread_poll::thread_poll(int count) {
                         });
 
                         if (!this->started.load() || this->task_queue.empty()) return;
+
                         func = move(this->task_queue.front());
                         this->task_queue.pop();
                     }
@@ -35,25 +36,15 @@ thread_poll::~thread_poll() {
     }
 }
 
-template<class F, class... Args>
-auto thread_poll::push(F&& f, Args&&... args) -> future<decltype(f(args...))> {
+void thread_poll::push(const TaskFunction& function) {
     if (!this->started.load()) {
         throw "Thread poll not started.";
     }
 
-    using ReturnType = decltype(f(args...));
-    auto wrapped_function = make_shared<packaged_task<ReturnType()>>(
-        bind(forward<F>(f), forward<Args...>(args)...)
-    );
-
-    future<ReturnType> final_future = wrapped_function->get_future();
     {
         lock_guard<mutex> lock{this->sync_lock};
-        this->task_queue.emplace([wrapped_function]() {
-            (*wrapped_function)();
-        });
+        this->task_queue.emplace(function);
     }
 
     this->condition.notify_one();
-    return final_future;
 }

@@ -2,11 +2,20 @@
 #include "request.h"
 #include "helper.h"
 #include "response.h"
+#include "epoll_helper.h"
 
 using std::cin, std::cout, std::cerr, std::endl;
 const unsigned int MAX_BUF = 8192;
 
-void handler::handle(int fd) {
+void handler::handle(int epoll_fd, int conn_fd) {
+    signal(SIGPIPE, SIG_IGN);
+
+    handler::_handle_read(conn_fd);
+    close(conn_fd);
+    epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN);
+}
+
+void handler::_handle_read(int fd) {
     char buffer[MAX_BUF];
 
     request http_request{};

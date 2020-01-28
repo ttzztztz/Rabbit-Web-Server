@@ -3,9 +3,8 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
-#include <sys/signal.h>
-#include <unordered_map>
 
+#include "helper.h"
 #include "request.h"
 #include "handler.h"
 #include "epoll_helper.h"
@@ -14,10 +13,11 @@
 const unsigned int MAX_EVENTS = 128;
 const unsigned int FD_SIZE = 1024;
 
+using std::bind;
+
 int main() {
     thread_poll poll(8);
-    signal(SIGPIPE, SIG_IGN);
-
+    
     sockaddr_in server_addr{};
     server_addr.sin_port = htons(8788);
     server_addr.sin_family = AF_INET;
@@ -51,13 +51,11 @@ int main() {
                     epoll_helper::create_event(epoll_fd, conn_fd, EPOLLIN);
                 }
             } else if (ev & EPOLLIN) {
-                const int conn_fd = events[i].data.fd;
-                printf("[%d] Start reading process\n", conn_fd);
-                handler::handle(conn_fd);
+                int conn_fd = events[i].data.fd;
 
-                printf("[%d] Write OK\n", conn_fd);
                 epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN);
-                close(conn_fd);
+                printf("[%d] connect epoll in event \n", conn_fd);
+                poll.push(bind(handler::handle, epoll_fd, conn_fd));
             }
         }
     }

@@ -49,7 +49,15 @@ void helper::parse_header(int fd, request &req) {
 }
 
 void helper::parse_body(int fd, request &req) {
-    // todo: finish
+    // char buffer[8192];
+    // memset(buffer, 0, sizeof(buffer));
+
+    // int n = 0;
+    // while ((n = read(fd, buffer, 8192)) > 0) {
+    //     for (int i = 0; i < n; i++) {
+    //         req.body += buffer[i];
+    //     }
+    // }
 }
 
 optional<string> helper::read_file_extension(const string &url) {
@@ -79,4 +87,8 @@ string helper::get_file_type(const string &file_extensions) {
 
 bool helper::file_exist(const string &file_name, struct stat& file_stat) {
     return stat(file_name.c_str(), &file_stat) >= 0;
+}
+
+void helper::test() {
+    std::cout << "test!!!";
 }

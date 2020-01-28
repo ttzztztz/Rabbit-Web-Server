@@ -5,12 +5,13 @@
 #include <unistd.h>
 #include <sstream>
 #include <optional>
+#include <cstring>
 #include <unordered_set>
 #include <sys/stat.h>
 
 #include "request.h"
 
-using std::string, std::stringstream, std::optional, std::unordered_set;
+using std::string, std::stringstream, std::optional, std::unordered_set, std::memset;
 
 class helper {
 public:
@@ -21,6 +22,8 @@ public:
     static optional<string> read_file_extension(const string& url);
     static string get_file_type(const string& file_extensions);
     static bool file_exist(const string& file_name, struct stat& file_stat);
+    
+    static void test();
 };
 
 

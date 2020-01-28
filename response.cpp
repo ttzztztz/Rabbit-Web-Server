@@ -6,8 +6,6 @@ string response::build() {
         response_header += one_pair.first + ": " + one_pair.second + "\r\n";
     }
     response_header += "\r\n";
-
-    printf("Response build: \n%s\n\n", response_header.c_str());
     return response_header;
 }
 

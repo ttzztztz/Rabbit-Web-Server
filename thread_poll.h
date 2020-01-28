@@ -8,12 +8,10 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
-#include <future>
 #include <memory>
 
 using std::thread, std::mutex, std::condition_variable, std::atomic, std::lock_guard, std::unique_lock;
-using std::future, std::packaged_task;
-using std::vector, std::queue, std::bind, std::forward, std::function, std::make_shared;
+using std::vector, std::queue, std::function;
 
 class thread_poll {
 private:
@@ -31,8 +29,7 @@ public:
     thread_poll(int count = 8);
     ~thread_poll();
 
-    template<class F, class... Args>
-    auto push(F&& f, Args&&... args) -> future<decltype(f(args...))>;
+    void push(const TaskFunction& function);
 };
 
 
