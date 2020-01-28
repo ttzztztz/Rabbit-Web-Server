@@ -9,6 +9,7 @@ void handler::write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
     bool exec_result = handler::_write(epoll_fd, conn_fd, conn);
 
     if (exec_result) {
+        ::close(conn_fd);
         connection_storage.erase(conn_fd);
         printf("[%d] disposed \n", conn_fd);
     }
@@ -18,6 +19,7 @@ void handler::read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
     bool exec_result = handler::_read(epoll_fd, conn_fd, conn);
 
     if (exec_result) {
+        ::close(conn_fd);
         connection_storage.erase(conn_fd);
         printf("[%d] disposed \n", conn_fd);
     }
@@ -52,7 +54,6 @@ bool handler::_write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
         return false;
     }
 
-    ::close(conn_fd);
     return true;
 }
 
@@ -78,7 +79,6 @@ bool handler::_read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
         return false;
     }
 
-    ::close(conn_fd);
     return true;
 }
 
