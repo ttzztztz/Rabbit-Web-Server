@@ -38,6 +38,9 @@ void helper::read_http_first_line(shared_ptr<connection> conn) {
 }
 
 void helper::parse_header(shared_ptr<connection> conn) {
+    conn->req = unique_ptr<request>(new request());
+    helper::read_http_first_line(conn);
+
     string buffer;
     while (!(buffer = helper::readline_from_connection(conn)).empty()) {
         const size_t line_length = buffer.size();
@@ -55,18 +58,20 @@ void helper::parse_header(shared_ptr<connection> conn) {
 
         conn->req->header[key] = value;
     }
+
+    if (conn->req->header.count("Content-length")) {
+        conn->body_size = stol(conn->req->header["Content-length"]);
+    } else if (conn->req->header.count("content-length")) {
+        conn->body_size = stol(conn->req->header["content-length"]);
+    } else if (conn->req->header.count("Content-Length")) {
+        conn->body_size = stol(conn->req->header["Content-Length"]);
+    } else {
+        conn->body_size = 0;
+    }
 }
 
 void helper::parse_body(shared_ptr<connection> conn) {
-    // char buffer[8192];
-    // memset(buffer, 0, sizeof(buffer));
-
-    // int n = 0;
-    // while ((n = read(fd, buffer, 8192)) > 0) {
-    //     for (int i = 0; i < n; i++) {
-    //         req.body += buffer[i];
-    //     }
-    // }
+    conn->req->body = conn->read.substr(conn->read_ptr);
 }
 
 optional<string> helper::read_file_extension(const string &url) {

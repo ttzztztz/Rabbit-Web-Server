@@ -30,7 +30,7 @@ bool handler::_write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
         return false;
     }
     if (conn->req == nullptr) {
-        handler::parse_header(conn);
+        handler::parse_all(conn, true);
     }
 
     int n = 0, remain = conn->write.size() - conn->write_ptr;
@@ -66,7 +66,18 @@ bool handler::_read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
         printf("[%d] received %d \n", conn_fd, n);
         read_storage.append(buf, n);
 
-        if (read_storage.size() > 4 && read_storage.substr(read_storage.length() - 4, 4) == "\r\n\r\n") {
+        if (conn->req == nullptr) {
+            const int pos = read_storage.find("\r\n\r\n");
+            if (pos != std::string::npos) {
+                conn->header_size = pos + 4;
+
+                helper::parse_header(conn);
+            }
+        }
+
+        if (conn->req != nullptr && conn->header_size + conn->body_size == read_storage.size()) {
+            handler::parse_all(conn, false);
+            
             return handler::_write(epoll_fd, conn_fd, conn);
         }
     }
@@ -82,13 +93,13 @@ bool handler::_read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
     return true;
 }
 
-void handler::parse_header(shared_ptr<connection> conn) {
-    conn->req = unique_ptr<request>(new request());
+void handler::parse_all(shared_ptr<connection> conn, bool init) {
+    if (init) {
+        conn->req = unique_ptr<request>(new request());
+        helper::parse_header(conn);
+    }
 
-    helper::read_http_first_line(conn);
-    helper::parse_header(conn);
     helper::parse_body(conn);
-
     // free memory
     conn->read.clear();
     conn->read_ptr = 0;

@@ -4,13 +4,6 @@ connection::connection() {
     this->read_ptr = 0;
     this->write_ptr = 0;
     this->req = nullptr;
+    this->header_size = 0;
+    this->body_size = 0;
 }
-
-// void connection::dispose() {
-//     this->read_ptr = 0;
-//     this->write_ptr = 0;
-
-//     this->read.clear();
-//     this->write.clear();
-//     this->req.reset();
-// }

@@ -14,6 +14,9 @@ public:
     string read;
     string write;
 
+    size_t header_size;
+    size_t body_size;
+
     size_t read_ptr;
     size_t write_ptr;
 

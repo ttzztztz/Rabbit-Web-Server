@@ -26,7 +26,7 @@ public:
     static void read(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
     static void write(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
 private:
-    static void parse_header(shared_ptr<connection> conn);
+    static void parse_all(shared_ptr<connection> conn, bool init = true);
 
     static bool _read(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
     static bool _write(int epoll_fd, int conn_fd, shared_ptr<connection> conn);
