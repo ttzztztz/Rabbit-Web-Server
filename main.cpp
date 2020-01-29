@@ -63,9 +63,9 @@ int main() {
                     }
                     connection_storage.set(conn_fd, shared_ptr<connection>(new connection()));
                 }
-            } else if (ev & (EPOLLIN | EPOLLERR)) {
+            } else if (ev & EPOLLIN) {
                 int conn_fd = events[i].data.fd;
-                printf("[%d] connect epoll_in event \n", conn_fd);
+                printf("[%d] trigger epoll_in event \n", conn_fd);
                 if (!connection_storage.count(conn_fd)) {
                     printf("[%d] conn_fd invalid \n", conn_fd);
                     continue;
@@ -74,13 +74,18 @@ int main() {
                 poll.push(bind(handler::read, epoll_fd, conn_fd, connection_storage.get(conn_fd)));
             } else if (ev & EPOLLOUT) {
                 int conn_fd = events[i].data.fd;
-                printf("[%d] connect epoll_out event \n", conn_fd);
+                printf("[%d] trigger epoll_out event \n", conn_fd);
                 if (!connection_storage.count(conn_fd)) {
                     printf("[%d] conn_fd invalid \n", conn_fd);
                     continue;
                 }
 
                 poll.push(bind(handler::write, epoll_fd, conn_fd, connection_storage.get(conn_fd)));
+            } else if (ev & EPOLLERR) {
+                int conn_fd = events[i].data.fd;
+                printf("[%d] trigger epoll_err event \n", conn_fd);
+                connection_storage.erase(conn_fd);
+                printf("[%d] disposed \n", conn_fd);
             }
         }
     }

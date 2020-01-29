@@ -30,16 +30,18 @@ string helper::readline_from_connection(shared_ptr<connection> conn) {
     return result;
 }
 
-void helper::read_http_first_line(shared_ptr<connection> conn) {
+void helper::read_http_first_line(shared_ptr<connection> conn, int conn_fd) {
     stringstream ss;
 
     ss << readline_from_connection(conn);
     ss >> conn->req->method >> conn->req->path >> conn->req->version;
+
+    printf("[%d] %s %s %s \n", conn_fd, conn->req->method.c_str(), conn->req->path.c_str(), conn->req->version.c_str());
 }
 
-void helper::parse_header(shared_ptr<connection> conn) {
+void helper::parse_header(shared_ptr<connection> conn, int conn_fd) {
     conn->req = unique_ptr<request>(new request());
-    helper::read_http_first_line(conn);
+    helper::read_http_first_line(conn, conn_fd);
 
     string buffer;
     while (!(buffer = helper::readline_from_connection(conn)).empty()) {
@@ -68,10 +70,13 @@ void helper::parse_header(shared_ptr<connection> conn) {
     } else {
         conn->body_size = 0;
     }
+
+    printf("[%d] header parse invoked, body_size = %lu \n", conn_fd, conn->body_size);
 }
 
-void helper::parse_body(shared_ptr<connection> conn) {
+void helper::parse_body(shared_ptr<connection> conn, int conn_fd) {
     conn->req->body = conn->read.substr(conn->read_ptr);
+    printf("[%d] body parse invoked \n", conn_fd);
 }
 
 optional<string> helper::read_file_extension(const string &url) {
