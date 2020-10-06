@@ -10,6 +10,7 @@ void handler::write(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
 
     if (exec_result) {
         ::close(conn_fd);
+        epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN | EPOLLOUT | EPOLLET);
         connection_storage.erase(conn_fd);
         printf("[%d] disposed \n", conn_fd);
     }
@@ -20,6 +21,7 @@ void handler::read(int epoll_fd, int conn_fd, shared_ptr<connection> conn) {
 
     if (exec_result) {
         ::close(conn_fd);
+        epoll_helper::delete_event(epoll_fd, conn_fd, EPOLLIN | EPOLLOUT | EPOLLET);
         connection_storage.erase(conn_fd);
         printf("[%d] disposed \n", conn_fd);
     }
